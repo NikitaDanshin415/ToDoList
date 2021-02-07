@@ -7,28 +7,47 @@ import ItemStatusFilter from "../item-status-filter/";
 
 import './app.css';
 import ItemAddForm from "../item-add-form";
+import toDoAPI from '../../servise/toDoAPI'
 
 export default class App extends Component{
 
     iter = 0;
-    createTodoItem = (text) => {
-        return {key: this.iter++, label: text, done:false, important: false};
+
+    toDoAPI = new toDoAPI()
+
+
+    parceTodoItem = (item) => {
+        return {key: item.id, label: item.name, done:item.isComplete, important: item.isImportant};
     }
+
     state={
-        toDoData :[
-            this.createTodoItem('Drink Coffie'),
-            this.createTodoItem('Make Awesome app'),
-            this.createTodoItem('Have a lunch'),
-        ],
+        toDoData :[],
         term:'',
         filter: 'all',
     }
 
+    componentDidMount() {
+        this.toDoAPI.getTodoList().then((res)=>{
+            let toDoArr = [];
+
+            for (let item in res) {
+                toDoArr.push(this.parceTodoItem(res[item]));
+            }
+            this.iter = res[res.length-1].id
+            this.setState({
+                toDoData : toDoArr
+            })
+        })
+    }
+
+    //----------------------------------------------------------------------------------------------------------------------
+
     toggleProperty (arr, id ,propName) {
         const idx = arr.findIndex((el) => el.key === id);
-
         const oldItem = arr[idx];
         const newItem = {...oldItem, [propName]: !oldItem[propName]};
+
+        this.toDoAPI.updateTodo(newItem);
 
         return [
             ...arr.slice(0,idx),
@@ -38,26 +57,32 @@ export default class App extends Component{
     }
 
     deleteItem = (id) => {
-        this.setState((state) => {
-            const idx = state.toDoData.findIndex((el) => el.key === id);
+        this.toDoAPI.deleteTodo(id);
+        const idx = this.state.toDoData.findIndex((el) => el.key === id);
 
+        const data = [
+            ...this.state.toDoData.slice(0,idx),
+            ...this.state.toDoData.slice(idx+1)
+        ];
+
+        this.setState((state) => {
             return {
-                toDoData: [
-                    ...state.toDoData.slice(0,idx),
-                    ...state.toDoData.slice(idx+1)
-                ]
+                toDoData: data
             }
         });
     };
 
     addItem = (text) => {
-        if(text!=="") {
-            const item = this.createTodoItem(text);
+        if(text!==""){
+            this.toDoAPI.createTodo(text).then((res)=> {
+                const item = this.parceTodoItem(res);
 
-            this.setState(({ toDoData }) => {
-                return {
-                    toDoData: [...toDoData, item]
-                }
+                this.setState(({ toDoData }) => {
+                    return {
+                        toDoData: [...toDoData, item]
+                    }
+                })
+
             });
         }
     };
@@ -73,7 +98,7 @@ export default class App extends Component{
             return {toDoData: this.toggleProperty(toDoData, id, 'done')};
         });
     };
-
+//----------------------------------------------------------------------------
     searchItem = (text) =>{
         this.setState({
             term: text,
@@ -112,6 +137,7 @@ export default class App extends Component{
 
 
         const filterItems = this.filter(visibleItems, this.state.filter)
+
 
 
         return(
